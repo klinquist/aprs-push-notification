@@ -7,7 +7,8 @@ const aprs = require('aprs-parser');
 const Push = require('pushover-notifications');
 const ngeohash = require('ngeohash');
 const geolib = require('geolib');
-const NodeCache = require( 'node-cache' );
+const NodeCache = require('node-cache');
+const moment = require('moment');
 
 const pushCache = new NodeCache({ stdTTL: dedupeMinutes*60});
 
@@ -48,12 +49,25 @@ const getRadio = event => {
     return '';
 };
 
+const getComment = event => {
+    if (event && event.data && event.data.comment) {
+        return ` (${event.data.comment.trim()})`;
+    }
+    return '';
+};
+
 const getRoundedDistance = distance => {
     return Math.round(distance * 10) / 10;
 };
 
-const getMsg = (msg, distance, event) => {
-    return `${msg}: ${getRoundedDistance(distance)} mi away from ${getCall(event)}${getRadio(event)}`;
+const getMsg = (msg, distance, direction, event) => {
+    const now = moment().format('MMM Do h:mm:ss A');
+    if (direction) {
+        return `${now}: ${msg}: ${getCall(event)} is ${getRoundedDistance(distance)} mi ${direction}${getRadio(event)}${getComment(event)}`;
+    } else {
+        return `${now}: ${msg}: ${getCall(event)} is ${getRoundedDistance(distance)} mi ${getRadio(event)}${getComment(event)}`;
+    }
+
 };
 
 const processEvent = event => {
@@ -67,14 +81,15 @@ const processEvent = event => {
         { latitude: lat, longitude: long },
         { latitude: currentElement.myLat, longitude: currentElement.myLong }
     );
+    const direction = geolib.getCompassDirection( { latitude: currentElement.myLat, longitude: currentElement.myLong },{ latitude: lat, longitude: long });
     distance = distance * 0.000621371; //m to mi
     if (currentElement.exclude.indexOf(getCall(event)) > -1) {
-        console.log(getMsg('Excluded beacon', distance, event));
+        console.log(getMsg('Excluded beacon', distance, direction, event));
     } else if (pushCache.get(getCall(event))) {
-        console.log(getMsg('Duplicate beacon', distance, event));
+        console.log(getMsg('Duplicate beacon', distance, direction, event));
     } else if (distance < currentElement.reportCloserThanDistanceMiles) {
         const push = new Push({ user: currentElement.pushoverUser, token: currentElement.pushoverTokenUser });
-        const msg = getMsg('APRS beacon', distance, event);
+        const msg = getMsg('APRS beacon', distance, direction, event);
         console.log(msg);
         push.send({
             message: msg,
@@ -87,7 +102,7 @@ const processEvent = event => {
             }
         });
     } else {
-        console.log(getMsg('Nearby but not close enough to send a push notification', distance, event));
+        console.log(getMsg(`Nearby geohash ${location} but not close enough to send a push notification`, distance, direction, event));
     }
 
 };

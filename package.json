@@ -11,6 +11,7 @@
   "dependencies": {
     "aprs-parser": "latest",
     "geolib": "^3.3.1",
+    "moment": "^2.29.1",
     "ngeohash": "^0.6.3",
     "node-cache": "^5.1.2",
     "pushover-notifications": "^1.2.2"

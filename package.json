@@ -1,0 +1,18 @@
+{
+  "name": "aprs-push-notification",
+  "version": "1.0.0",
+  "description": "Send a push notification for all APRS beacons close to you!",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Kris Linquist <kris@linquist.net>",
+  "license": "ISC",
+  "dependencies": {
+    "aprs-parser": "latest",
+    "geolib": "^3.3.1",
+    "ngeohash": "^0.6.3",
+    "node-cache": "^5.1.2",
+    "pushover-notifications": "^1.2.2"
+  }
+}

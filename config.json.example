@@ -1,0 +1,14 @@
+{
+    "myCall":"XXXXX",
+    "beacons":[ 
+        {
+            "myLat": 37.129212,
+            "myLong": -121.12312,
+            "reportCloserThanDistanceMiles": 1.0,
+            "pushoverUser": "XXX",
+            "pushoverToken": "XXX",
+            "exclude": ["XXXXX-10"]
+        }
+    ]
+}
+

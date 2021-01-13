@@ -109,7 +109,7 @@ const processInclude = (lat, long, event, currentElement) => {
     distance = distance * 0.000621371; //m to mi
     const msg = getMsg('Beacon', currentElement.prefix, distance, direction, event);
     console.log(msg);
-    sendPush(currentElement.pushoverUser, currentElement.pushoverTokenUser, msg, (err, res) => {
+    sendPush(currentElement.pushoverUser, currentElement.pushoverToken, msg, (err, res) => {
         if (!err) includesCache.set(getCall(event), new Date().toISOString());
     });
 
@@ -130,7 +130,7 @@ const processNearby = (lat, long, event, location, currentElement) => {
     } else if (distance < currentElement.reportCloserThanDistanceMiles) {
         const msg = getMsg('Nearby beacon', currentElement.prefix,distance, direction, event);
         console.log(msg);
-        sendPush(currentElement.pushoverUser, currentElement.pushoverTokenUser, msg, (err, res) => {
+        sendPush(currentElement.pushoverUser, currentElement.pushoverToken, msg, (err, res) => {
             if (!err) nearbyCache.set(getCall(event), new Date().toISOString());
         });
     } else {

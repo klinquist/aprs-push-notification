@@ -7,7 +7,8 @@
             "reportCloserThanDistanceMiles": 1.0,
             "pushoverUser": "XXX",
             "pushoverToken": "XXX",
-            "exclude": ["XXXXX-10"]
+            "exclude": ["XXXXX-10"],
+            "include": ["XXXXX", "XXXXX-2"]
         }
     ]
 }

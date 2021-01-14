@@ -103,7 +103,7 @@ const processInclude = (lat, long, event, currentElement) => {
         { latitude: currentElement.myLat, longitude: currentElement.myLong }
     );
     if (includesCache.get(getCall(event))) {
-        console.log('Discarding duplicate');
+        return console.log('Discarding duplicate');
     }
     const direction = geolib.getCompassDirection({ latitude: currentElement.myLat, longitude: currentElement.myLong }, { latitude: lat, longitude: long });
     distance = distance * 0.000621371; //m to mi

@@ -9,7 +9,7 @@
   "author": "Kris Linquist <kris@linquist.net>",
   "license": "ISC",
   "dependencies": {
-    "aprs-parser": "latest",
+    "aprs-parser2": "^1.0.4",
     "geolib": "^3.3.1",
     "moment": "^2.29.1",
     "ngeohash": "^0.6.3",

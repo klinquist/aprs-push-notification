@@ -4,7 +4,7 @@ const nearbyDedupeMinutes = 10;
 const includesDedupeMinutes = 30;
 
 
-const aprs = require('aprs-parser');
+const aprs = require('aprs-parser2');
 const Push = require('pushover-notifications');
 const ngeohash = require('ngeohash');
 const geolib = require('geolib');

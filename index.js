@@ -31,19 +31,23 @@ const geoObj = {};
 const includeObj = {};
 
 console.log('Building geohash & include cache...');
-for (let i = 0; i < pushUsers.beacons.length; i++){
-    const hash = ngeohash.encode(pushUsers.beacons[i].myLat, pushUsers.beacons[i].myLong, hashPrecision);
-    console.log(`Assigning hash "${hash}" to array element ${i}`);
+Object.keys(pushUsers.beacons).forEach((el) => {
+    const hash = ngeohash.encode(pushUsers.beacons[el].myLat, pushUsers.beacons[el].myLong, hashPrecision);
+    console.log(`Assigning hash "${hash}" to key ${el}`);
     if (typeof geoObj[hash] == 'undefined') geoObj[hash] = [];
-    geoObj[hash].push(i);
-    if (pushUsers.beacons[i].include) {
-        for (let p = 0; p < pushUsers.beacons[i].include.length; p++){
-            console.log(`Assigning include "${pushUsers.beacons[i].include[p]}" to array element ${i}`);
-            if (typeof includeObj[pushUsers.beacons[i].include[p]] == 'undefined') includeObj[pushUsers.beacons[i].include[p]] = [];
-            includeObj[pushUsers.beacons[i].include[p]].push(i);
+    pushUsers.beacons[el].prefix = el;
+    geoObj[hash].push(el);
+    if (pushUsers.beacons[el].include) {
+        for (let p = 0; p < pushUsers.beacons[el].include.length; p++){
+            console.log(`Assigning include "${pushUsers.beacons[el].include[p]}" to key ${el}`);
+            if (typeof includeObj[pushUsers.beacons[el].include[p]] == 'undefined') includeObj[pushUsers.beacons[el].include[p]] = [];
+            includeObj[pushUsers.beacons[el].include[p]].push(el);
         }
     }
-}
+});
+
+
+
 
 
 const getCall = event => {
@@ -72,9 +76,8 @@ const getRoundedDistance = distance => {
     return Math.round(distance * 10) / 10;
 };
 
-const getMsg = (msg, prefix, distance, direction, event) => {
+const getMsg = (msg, pfx, distance, direction, event) => {
     const now = moment().format('MMM Do h:mm:ss A');
-    const pfx = prefix || '';
     let rtn;
     if (direction) {
         rtn =  `${now}: ${pfx} ${msg}: ${getCall(event)} is ${getRoundedDistance(distance)} mi ${direction} ${getRadio(event)} ${getComment(event)}`;

@@ -13,22 +13,21 @@ Rename `config.json.example` to `config.json` and edit it.  Below is the format,
 ```
 {
     "myCall":"XXXXX",                              //Your amateur radio callsign
-    "beacons":[ 
-        { 
+    "beacons": {
+        "myHouse": {                               //Name your location here. This will be a prefix on your text messages!
             "myLat": 37.129212,                    //Your latitude
             "myLong": -121.12312,                  //Your longitude
             "reportCloserThanDistanceMiles": 1.0,  //Send a push notification if there are any beacons closer than this many miles 
             "pushoverUser": "XXX",                 //Pushover user key
             "pushoverToken": "XXX",                //Pushover app token
-            "prefix": "",                          //Prefix to include in the push notification (in case you are monitoring >1 location)
             "exclude": ["XXXXX-10"]                //Exclude these call signs from location-based push notifications
             "include": ["XXXXX", "XXXXX-2"]        //Always receive push notifications of beacons from these calls regardless of location
         }
-    ]
+    }
 }
 ```
 
-"beacons" is an array, so you can support multiple users/locations.
+"beacons" is an object, so you can support multiple users/locations by creating additional named objects
 
 
 By default the script will exclude duplicate location-based messages sent within 10 minutes and exclude duplicate "include" messages sent within 30 minutes.

@@ -1,5 +1,5 @@
 
-const hashPrecision = 3;
+const hashPrecision = 3; //You should probably keep this as "3" unless you are receiving push notifications for a wide area (>30mi).  If that's the case, make this a "2"
 const nearbyDedupeMinutes = 10;
 const includesDedupeMinutes = 30;
 
@@ -73,27 +73,57 @@ const getComment = event => {
 };
 
 const getRoundedDistance = distance => {
-    return Math.round(distance * 10) / 10;
+    return (Math.round(distance * 10) / 10).toString() + ' mi';
+};
+
+const getPrefix = pfx => {
+    return `(${pfx})`;
+};
+
+const getTime = () => {
+    return moment().format('MMM Do h:mm:ss A');
+};
+
+const getDirection = (direction) => {
+    return direction || '';
+};
+
+const getLink = (event) => {
+    let call;
+    if (event.from.ssid) {
+        call= event.from.call + '-' + event.from.ssid;
+    } else {
+        call= event.from.call;
+    }
+    return `https://aprs.fi/#!call=a%2F${call}`;
 };
 
 const getMsg = (msg, pfx, distance, direction, event) => {
-    const now = moment().format('MMM Do h:mm:ss A');
-    let rtn;
-    if (direction) {
-        rtn =  `${now}: ${pfx} ${msg}: ${getCall(event)} is ${getRoundedDistance(distance)} mi ${direction} ${getRadio(event)} ${getComment(event)}`;
-    } else {
-        rtn = `${now}: ${pfx} ${msg}: ${getCall(event)} is ${getRoundedDistance(distance)} mi ${getRadio(event)} ${getComment(event)}`;
-    }
-    rtn = rtn.replace(/\s\s+/g, ' ');
+    let rtn = [
+        getTime(),
+        ':',
+        getPrefix(pfx),
+        msg,
+        getCall(event),
+        'is',
+        getRoundedDistance(distance),
+        getDirection(direction),
+        getRadio(event),
+        getComment(event)
+    ];
+    rtn = rtn.join(' ');
+    rtn = rtn.replace(/\s\s+/g, ' '); //Get rid of extra spaces
     return rtn;
 };
 
 
-const sendPush = (user, token, msg, cb) => {
+const sendPush = (user, token, msg, url, cb) => {
     const push = new Push({ user, token });
     push.send({
         message: msg,
-        priority: 1
+        priority: 1,
+        url,
+        url_title: 'aprs.fi'
     }, (err) => {
         if (err) console.log('Error sending push notification: ' + err);
         return cb(err);
@@ -106,14 +136,18 @@ const processInclude = (lat, long, event, currentElement) => {
         { latitude: currentElement.myLat, longitude: currentElement.myLong }
     );
     if (includesCache.get(getCall(event))) {
-        return console.log('Discarding duplicate');
+        return console.log(getMsg('Duplicate beacon', currentElement.prefix,distance, direction, event));
     }
     const direction = geolib.getCompassDirection({ latitude: currentElement.myLat, longitude: currentElement.myLong }, { latitude: lat, longitude: long });
     distance = distance * 0.000621371; //m to mi
     const msg = getMsg('Beacon', currentElement.prefix, distance, direction, event);
     console.log(msg);
     sendPush(currentElement.pushoverUser, currentElement.pushoverToken, msg, (err, res) => {
-        if (!err) includesCache.set(getCall(event), new Date().toISOString());
+        if (err) {
+            console.log('Error sending push notification! ' + err);
+        } else {
+            includesCache.set(getCall(event), new Date().toISOString());
+        }
     });
 
 };
@@ -133,13 +167,19 @@ const processNearby = (lat, long, event, location, currentElement) => {
     } else if (distance < currentElement.reportCloserThanDistanceMiles) {
         const msg = getMsg('Nearby beacon', currentElement.prefix,distance, direction, event);
         console.log(msg);
-        sendPush(currentElement.pushoverUser, currentElement.pushoverToken, msg, (err, res) => {
-            if (!err) nearbyCache.set(getCall(event), new Date().toISOString());
+        sendPush(currentElement.pushoverUser, currentElement.pushoverToken, msg, getLink(event), (err, res) => {
+            if (err) {
+                console.log('Error sending push notification! ' + err);
+            } else {
+                nearbyCache.set(getCall(event), new Date().toISOString());
+            }
         });
     } else {
         console.log(getMsg(`Nearby geohash ${location} but not close enough to send a push notification`, currentElement.prefix, distance, direction, event));
     }
 };
+
+
 
 const processEvent = event => {
     const lat = get('data.latitude', event);

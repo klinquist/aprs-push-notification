@@ -34,3 +34,18 @@ By default the script will exclude duplicate location-based messages sent within
 
 
 Run `npm install` to install dependencies, then `node index.js`.  Run under pm2 or similar for persistence.
+
+
+#### Design
+
+I [geohash](https://en.wikipedia.org/wiki/Geohash) the lat/longs in the config file along with every incoming message, then perform a distance calculation on beacons that match the geohash. This method is faster than calculating the distance for every incoming message (over twice as fast!), resulting in less CPU usage.   The APRS firehose can receive 250+ messages per second.
+
+
+### Don't have a pi or other "server" to run this on?
+
+Contact me and I'll be happy to add your location to my instance running 24/7.
+
+
+
+
+

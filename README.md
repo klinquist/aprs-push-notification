@@ -21,7 +21,8 @@ Rename `config.json.example` to `config.json` and edit it.  Below is the format,
             "pushoverUser": "XXX",                 //Pushover user key
             "pushoverToken": "XXX",                //Pushover app token
             "exclude": ["XXXXX-10"]                //Exclude these call signs from location-based push notifications
-            "include": ["XXXXX", "XXXXX-2"]        //Always receive push notifications of beacons from these calls regardless of location
+            "include": ["XXXXX", "XXXXX-2"],       //Always receive push notifications of beacons from these calls regardless of location
+            "timezone": "America/Los_Angeles"      //Time zone (for log files & prefixing push notifications)
         }
     }
 }

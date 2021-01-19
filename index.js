@@ -10,7 +10,7 @@ const Push = require('pushover-notifications');
 const ngeohash = require('ngeohash');
 const geolib = require('geolib');
 const NodeCache = require('node-cache');
-const moment = require('moment');
+const moment = require('moment-timezone');
 const request = require('request');
 
 const nearbyCache = new NodeCache({ stdTTL: nearbyDedupeMinutes * 60 });
@@ -90,8 +90,8 @@ const getPrefix = pfx => {
     return `(${pfx})`;
 };
 
-const getTime = () => {
-    return moment().format('MMM Do h:mm:ss A');
+const getTime = (tz) => {
+    return moment().tz(tz).format('MMM Do h:mm:ss A z');
 };
 
 const getDirection = (direction) => {
@@ -140,9 +140,9 @@ const getLicenseString = (lic) => {
 };
 
 const getMsg = (opts) => {
-    const { msg, pfx, distance, direction, event, license} = opts;
+    const { msg, pfx, distance, direction, event, license, tz} = opts;
     let rtn = [
-        getTime(),
+        getTime(tz),
         ':',
         getPrefix(pfx),
         msg,
@@ -181,12 +181,12 @@ const processInclude = (opts) => {
         { latitude: currentElement.myLat, longitude: currentElement.myLong }
     );
     if (includesCache.get(getCall(event))) {
-        return console.log(getMsg({ msg: 'Duplicate beacon', pfx: currentElement.prefix, distance, direction, event }));
+        return console.log(getMsg({ msg: 'Duplicate beacon', pfx: currentElement.prefix, distance, direction, event, tz: currentElement.timezone }));
     }
     const direction = geolib.getCompassDirection({ latitude: currentElement.myLat, longitude: currentElement.myLong }, { latitude: lat, longitude: long });
     distance = distance * 0.000621371; //m to mi
     getNameFromAPI(event, (err, res) => {
-        const msg = getMsg({ msg: 'Beacon', pfx: currentElement.prefix, distance, direction, event });
+        const msg = getMsg({ msg: 'Beacon', pfx: currentElement.prefix, distance, direction, event, tz: currentElement.timezone });
         console.log(msg);
         sendPush({ user: currentElement.pushoverUser, token: currentElement.pushoverToken, msg, license: res }, (err, res) => {
             if (err) {
@@ -210,12 +210,12 @@ const processNearby = (opts) => {
     const direction = geolib.getCompassDirection( { latitude: currentElement.myLat, longitude: currentElement.myLong },{ latitude: lat, longitude: long });
     distance = distance * 0.000621371; //m to mi
     if (currentElement.exclude.indexOf(getCall(event)) > -1) {
-        console.log(getMsg({ msg: 'Excluded beacon', pfx: currentElement.prefix, distance, direction, event }));
+        console.log(getMsg({ msg: 'Excluded beacon', pfx: currentElement.prefix, distance, direction, event,tz: currentElement.timezone }));
     } else if (nearbyCache.get(getCall(event))) {
-        console.log(getMsg({ msg: 'Duplicate beacon', pfx: currentElement.prefix, distance, direction, event }));
+        console.log(getMsg({ msg: 'Duplicate beacon', pfx: currentElement.prefix, distance, direction, event,tz: currentElement.timezone }));
     } else if (distance < currentElement.reportCloserThanDistanceMiles) {
         getNameFromAPI(event, (err, res) => {
-            const msg = getMsg({ msg: 'Nearby beacon', pfx: currentElement.prefix, distance, direction, event, license: res });
+            const msg = getMsg({ msg: 'Nearby beacon', pfx: currentElement.prefix, distance, direction, event, license: res,tz: currentElement.timezone });
             console.log(msg);
             sendPush({ user: currentElement.pushoverUser, token: currentElement.pushoverToken, msg, url: getLink(event) }, (err, res) => {
                 if (err) {
@@ -226,7 +226,7 @@ const processNearby = (opts) => {
             });
         });
     } else {
-        console.log(getMsg({ msg: `Nearby geohash ${location} but not close enough to send a push notification`, pfx: currentElement.prefix, distance, direction, event } ));
+        console.log(getMsg({ msg: `Nearby geohash ${location} but not close enough to send a push notification`, pfx: currentElement.prefix, distance, direction, event, tz: currentElement.timezone } ));
     }
 };
 

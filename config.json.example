@@ -9,7 +9,8 @@
                 "pushoverUser": "XXX",
                 "pushoverToken": "XXX",
                 "exclude": ["XXXXX-10"],
-                "include": ["XXXXX", "XXXXX-2"]
+                "include": ["XXXXX", "XXXXX-2"],
+                "timezone": "America/Los_Angeles"
             }
     }
 }

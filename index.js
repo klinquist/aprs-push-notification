@@ -91,6 +91,7 @@ const getPrefix = pfx => {
 };
 
 const getTime = (tz) => {
+    if (!tz) tz = 'America/Los_Angeles';
     return moment().tz(tz).format('MMM Do h:mm:ss A z');
 };
 

@@ -2,6 +2,7 @@
 const hashPrecision = 3; //You should probably keep this as "3" unless you are receiving push notifications for a wide area (>30mi).  If that's the case, make this a "2"
 const nearbyDedupeMinutes = 10;
 const includesDedupeMinutes = 30;
+const licenseCacheDays = 14;
 
 
 const aprs = require('aprs-parser');
@@ -10,9 +11,11 @@ const ngeohash = require('ngeohash');
 const geolib = require('geolib');
 const NodeCache = require('node-cache');
 const moment = require('moment');
+const request = require('request');
 
 const nearbyCache = new NodeCache({ stdTTL: nearbyDedupeMinutes * 60 });
-const includesCache = new NodeCache({ stdTTL: includesDedupeMinutes*60});
+const includesCache = new NodeCache({ stdTTL: includesDedupeMinutes * 60 });
+const licenseCache = new NodeCache({ stdTTL: licenseCacheDays*60*1440});
 
 const get = (p, o) => {
     if (!Array.isArray(p)) p = p.split('.');
@@ -48,6 +51,13 @@ Object.keys(pushUsers.beacons).forEach((el) => {
 
 
 
+const titleCase = (string) => {
+    var sentence = string.toLowerCase().split(' ');
+    for(var i = 0; i< sentence.length; i++){
+        sentence[i] = sentence[i][0].toUpperCase() + sentence[i].slice(1).toLowerCase();
+    }
+    return sentence.join(' ');
+};
 
 
 const getCall = event => {
@@ -98,7 +108,39 @@ const getLink = (event) => {
     return `https://aprs.fi/#!call=a%2F${call}`;
 };
 
-const getMsg = (msg, pfx, distance, direction, event) => {
+
+const formatAPIResponse = (lic) => {
+    if (!lic.name) return ('Unknown license');
+    if (lic.current && lic.current.operClass) {
+        return titleCase(lic.name) + ' (' + lic.current.operClass + ')';
+    } else {
+        return titleCase(lic.name);
+    }
+};
+
+const getNameFromAPI = (event, cb) => {
+    if (!event.from || !event.from.call) return cb(null, '');
+    const lc = licenseCache.get(event.from.call);
+    if (lc) return cb(null, lc);
+    const url = `http://callook.info/index.php?callsign=${event.from.call}&display=json`;
+    request({ method: 'GET', uri: url, json: true }, (err, res, data) => {
+        if (err) {
+            return cb(null, 'Unknown license');
+        } else {
+            const fmt = formatAPIResponse(data);
+            licenseCache.set(event.from.call, fmt);
+            return cb(null, fmt);
+        }
+    });
+};
+
+const getLicenseString = (lic) => {
+    if (!lic) return '';
+    return ' - ' + lic;
+};
+
+const getMsg = (opts) => {
+    const { msg, pfx, distance, direction, event, license} = opts;
     let rtn = [
         getTime(),
         ':',
@@ -109,7 +151,8 @@ const getMsg = (msg, pfx, distance, direction, event) => {
         getRoundedDistance(distance),
         getDirection(direction),
         getRadio(event),
-        getComment(event)
+        getComment(event),
+        getLicenseString(license)
     ];
     rtn = rtn.join(' ');
     rtn = rtn.replace(/\s\s+/g, ' '); //Get rid of extra spaces
@@ -117,7 +160,8 @@ const getMsg = (msg, pfx, distance, direction, event) => {
 };
 
 
-const sendPush = (user, token, msg, url, cb) => {
+const sendPush = (opts, cb) => {
+    const { user, token, msg, url} = opts;
     const push = new Push({ user, token });
     push.send({
         message: msg,
@@ -130,30 +174,35 @@ const sendPush = (user, token, msg, url, cb) => {
     });
 };
 
-const processInclude = (lat, long, event, currentElement) => {
+const processInclude = (opts) => {
+    const { lat, long, event, currentElement } = opts;
     let distance = geolib.getDistance(
         { latitude: lat, longitude: long },
         { latitude: currentElement.myLat, longitude: currentElement.myLong }
     );
     if (includesCache.get(getCall(event))) {
-        return console.log(getMsg('Duplicate beacon', currentElement.prefix,distance, direction, event));
+        return console.log(getMsg({ msg: 'Duplicate beacon', pfx: currentElement.prefix, distance, direction, event }));
     }
     const direction = geolib.getCompassDirection({ latitude: currentElement.myLat, longitude: currentElement.myLong }, { latitude: lat, longitude: long });
     distance = distance * 0.000621371; //m to mi
-    const msg = getMsg('Beacon', currentElement.prefix, distance, direction, event);
-    console.log(msg);
-    sendPush(currentElement.pushoverUser, currentElement.pushoverToken, msg, (err, res) => {
-        if (err) {
-            console.log('Error sending push notification! ' + err);
-        } else {
-            includesCache.set(getCall(event), new Date().toISOString());
-        }
+    getNameFromAPI(event, (err, res) => {
+        const msg = getMsg({ msg: 'Beacon', pfx: currentElement.prefix, distance, direction, event });
+        console.log(msg);
+        sendPush({ user: currentElement.pushoverUser, token: currentElement.pushoverToken, msg, license: res }, (err, res) => {
+            if (err) {
+                console.log('Error sending push notification! ' + err);
+            } else {
+                includesCache.set(getCall(event), new Date().toISOString());
+            }
+        });
     });
+
 
 };
 
 
-const processNearby = (lat, long, event, location, currentElement) => {
+const processNearby = (opts) => {
+    const { lat, long, event, location, currentElement} = opts;
     let distance = geolib.getDistance(
         { latitude: lat, longitude: long },
         { latitude: currentElement.myLat, longitude: currentElement.myLong }
@@ -161,21 +210,23 @@ const processNearby = (lat, long, event, location, currentElement) => {
     const direction = geolib.getCompassDirection( { latitude: currentElement.myLat, longitude: currentElement.myLong },{ latitude: lat, longitude: long });
     distance = distance * 0.000621371; //m to mi
     if (currentElement.exclude.indexOf(getCall(event)) > -1) {
-        console.log(getMsg('Excluded beacon', currentElement.prefix,distance, direction, event));
+        console.log(getMsg({ msg: 'Excluded beacon', pfx: currentElement.prefix, distance, direction, event }));
     } else if (nearbyCache.get(getCall(event))) {
-        console.log(getMsg('Duplicate beacon', currentElement.prefix,distance, direction, event));
+        console.log(getMsg({ msg: 'Duplicate beacon', pfx: currentElement.prefix, distance, direction, event }));
     } else if (distance < currentElement.reportCloserThanDistanceMiles) {
-        const msg = getMsg('Nearby beacon', currentElement.prefix,distance, direction, event);
-        console.log(msg);
-        sendPush(currentElement.pushoverUser, currentElement.pushoverToken, msg, getLink(event), (err, res) => {
-            if (err) {
-                console.log('Error sending push notification! ' + err);
-            } else {
-                nearbyCache.set(getCall(event), new Date().toISOString());
-            }
+        getNameFromAPI(event, (err, res) => {
+            const msg = getMsg({ msg: 'Nearby beacon', pfx: currentElement.prefix, distance, direction, event, license: res });
+            console.log(msg);
+            sendPush({ user: currentElement.pushoverUser, token: currentElement.pushoverToken, msg, url: getLink(event) }, (err, res) => {
+                if (err) {
+                    console.log('Error sending push notification! ' + err);
+                } else {
+                    nearbyCache.set(getCall(event), new Date().toISOString());
+                }
+            });
         });
     } else {
-        console.log(getMsg(`Nearby geohash ${location} but not close enough to send a push notification`, currentElement.prefix, distance, direction, event));
+        console.log(getMsg({ msg: `Nearby geohash ${location} but not close enough to send a push notification`, pfx: currentElement.prefix, distance, direction, event } ));
     }
 };
 
@@ -188,18 +239,18 @@ const processEvent = event => {
     const location = ngeohash.encode(lat, long, hashPrecision);
     if (includeObj[event.from.call]) {
         includeObj[event.from.call].forEach((el) => {
-            processInclude(lat, long, event, pushUsers.beacons[el]);
+            processInclude({ lat, long, event, currentElement: pushUsers.beacons[el] });
         });
     }
     if (includeObj[`${event.from.call}-${event.from.ssid}`]) {
         includeObj[`${event.from.call}-${event.from.ssid}`].forEach((el) => {
-            processInclude(lat, long, event, pushUsers.beacons[el]);
+            processInclude({ lat, long, event, currentElement: pushUsers.beacons[el] });
         });
     }
 
     if (typeof geoObj[location] == 'undefined') return;
     geoObj[location].forEach((el) => {
-        processNearby(lat, long, event, location,  pushUsers.beacons[el]);
+        processNearby({ lat, long, event, location, currentElement: pushUsers.beacons[el] });
     });
 };
 

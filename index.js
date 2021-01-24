@@ -234,12 +234,6 @@ const processNearby = (opts) => {
 
 
 const processEvent = event => {
-
-
-    if (event && event.data && event.data.comment && event.data.comment.match(/([cSgtrpPlLs#]\d{3}|t-\d{2}|h\d{2}|b\d{5}|s\.\d{2}|s\d\.\d)/g)) {
-        console.log(event.raw);
-    }
-
     const lat = get('data.latitude', event);
     const long = get('data.longitude', event);
     if (!lat || !long) return;

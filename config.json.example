@@ -1,4 +1,7 @@
 {
+    "nearbyDedupeMinutes": 60,
+    "includesDedupeMinutes": 240,
+    "hashPrecision":3,
     "myCall":"XXXXX",
     "beacons": {
         "myHouse":

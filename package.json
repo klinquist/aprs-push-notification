@@ -9,7 +9,7 @@
   "author": "Kris Linquist <kris@linquist.net>",
   "license": "ISC",
   "dependencies": {
-    "aprs-parser": "git+https://github.com/adriann0/npm-aprs-parser.git#master",
+    "aprs-parser": "^1.0.6",
     "geolib": "^3.3.1",
     "moment-timezone": "^0.5.32",
     "ngeohash": "^0.6.3",

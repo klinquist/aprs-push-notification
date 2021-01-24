@@ -12,6 +12,9 @@ Rename `config.json.example` to `config.json` and edit it.  Below is the format,
 
 ```
 {
+    "nearbyDedupeMinutes": 60,                     //Make sure you only receive a push notification at most every 'X' minutes for nearby beacons
+    "includesDedupeMinutes": 240,                  //Make sure you only receive a push notification at most every 'X' minutes for your "includes" list
+    "hashPrecision":3,                             //Geohashing precision.  A value of '3' is best for any distances (reportCloserThanDistanceMiles) under about 30.
     "myCall":"XXXXX",                              //Your amateur radio callsign
     "beacons": {
         "myHouse": {                               //Name your location here. This will be a prefix on your text messages!

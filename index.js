@@ -1,10 +1,4 @@
-
-const hashPrecision = 3; //You should probably keep this as "3" unless you are receiving push notifications for a wide area (>30mi).  If that's the case, make this a "2"
-const nearbyDedupeMinutes = 60;
-const includesDedupeMinutes = 240;
 const licenseCacheDays = 14;
-
-
 const aprs = require('aprs-parser');
 const Push = require('pushover-notifications');
 const ngeohash = require('ngeohash');
@@ -13,42 +7,54 @@ const NodeCache = require('node-cache');
 const moment = require('moment-timezone');
 const request = require('request');
 
-const nearbyCache = new NodeCache({ stdTTL: nearbyDedupeMinutes * 60 });
-const includesCache = new NodeCache({ stdTTL: includesDedupeMinutes * 60 });
-const licenseCache = new NodeCache({ stdTTL: licenseCacheDays*60*1440});
 
 const get = (p, o) => {
     if (!Array.isArray(p)) p = p.split('.');
     return p.reduce((xs, x) => (xs && xs[x]) ? xs[x] : null, o);
 };
 
-let pushUsers;
+let configFile;
 try {
-    pushUsers = JSON.parse(require('fs').readFileSync('./config.json'));
+    configFile = JSON.parse(require('fs').readFileSync('./config.json'));
 } catch (e) {
     console.log('Unable to read config.json');
     process.exit(1);
 }
 
+
+const nearbyDedupeMinutes = configFile.nearbyDedupeMinutes || 60;
+const includesDedupeMinutes = configFile.includesDedupeMinutes || 240;
+const hashPrecision = configFile.hashPrecision || 3;
+
+const nearbyCache = new NodeCache({ stdTTL: nearbyDedupeMinutes * 60 });
+const includesCache = new NodeCache({ stdTTL: includesDedupeMinutes * 60 });
+const licenseCache = new NodeCache({ stdTTL: licenseCacheDays*60*1440});
+
+
+
 const geoObj = {};
 const includeObj = {};
 
 console.log('Building geohash & include cache...');
-Object.keys(pushUsers.beacons).forEach((el) => {
-    const hash = ngeohash.encode(pushUsers.beacons[el].myLat, pushUsers.beacons[el].myLong, hashPrecision);
+Object.keys(configFile.beacons).forEach((el) => {
+    const hash = ngeohash.encode(configFile.beacons[el].myLat, configFile.beacons[el].myLong, hashPrecision);
     console.log(`Assigning hash "${hash}" to key ${el}`);
     if (typeof geoObj[hash] == 'undefined') geoObj[hash] = [];
-    pushUsers.beacons[el].prefix = el;
+    configFile.beacons[el].prefix = el;
     geoObj[hash].push(el);
-    if (pushUsers.beacons[el].include) {
-        for (let p = 0; p < pushUsers.beacons[el].include.length; p++){
-            console.log(`Assigning include "${pushUsers.beacons[el].include[p]}" to key ${el}`);
-            if (typeof includeObj[pushUsers.beacons[el].include[p]] == 'undefined') includeObj[pushUsers.beacons[el].include[p]] = [];
-            includeObj[pushUsers.beacons[el].include[p]].push(el);
+    if (configFile.beacons[el].include) {
+        for (let p = 0; p < configFile.beacons[el].include.length; p++){
+            console.log(`Assigning include "${configFile.beacons[el].include[p]}" to key ${el}`);
+            if (typeof includeObj[configFile.beacons[el].include[p]] == 'undefined') includeObj[configFile.beacons[el].include[p]] = [];
+            includeObj[configFile.beacons[el].include[p]].push(el);
         }
     }
 });
 
+
+const metersToMiles = (dist) => {
+    return dist* 0.000621371;
+};
 
 
 const titleCase = (string) => {
@@ -177,19 +183,19 @@ const sendPush = (opts, cb) => {
 
 const processInclude = (opts) => {
     const { lat, long, event, currentElement} = opts;
-    let distance = geolib.getDistance(
+    const distance = metersToMiles(geolib.getDistance(
         { latitude: lat, longitude: long },
         { latitude: currentElement.myLat, longitude: currentElement.myLong }
-    );
+    ));
     const direction = geolib.getCompassDirection({ latitude: currentElement.myLat, longitude: currentElement.myLong }, { latitude: lat, longitude: long });
     if (includesCache.get(getCall(event))) {
         return console.log(getMsg({ msg: 'Duplicate beacon', pfx: currentElement.prefix, distance, direction, event, tz: currentElement.timezone }));
     }
-    distance = distance * 0.000621371; //m to mi
+
     getNameFromAPI(event, (err, res) => {
         const msg = getMsg({ msg: 'Beacon', pfx: currentElement.prefix, distance, direction, event, tz: currentElement.timezone });
         console.log(msg);
-        sendPush({ user: currentElement.pushoverUser, token: currentElement.pushoverToken, msg, license: res }, (err, res) => {
+        sendPush({ user: currentElement.pushoverUser, token: currentElement.pushoverToken, msg, license: res, url: getLink(event) }, (err, res) => {
             if (err) {
                 console.log('Error sending push notification! ' + err);
             } else {
@@ -204,12 +210,11 @@ const processInclude = (opts) => {
 
 const processNearby = (opts) => {
     const { lat, long, event, location, currentElement} = opts;
-    let distance = geolib.getDistance(
+    const distance = metersToMiles(geolib.getDistance(
         { latitude: lat, longitude: long },
         { latitude: currentElement.myLat, longitude: currentElement.myLong }
-    );
+    ));
     const direction = geolib.getCompassDirection( { latitude: currentElement.myLat, longitude: currentElement.myLong },{ latitude: lat, longitude: long });
-    distance = distance * 0.000621371; //m to mi
     if (currentElement.exclude.indexOf(getCall(event)) > -1) {
         console.log(getMsg({ msg: 'Excluded beacon', pfx: currentElement.prefix, distance, direction, event,tz: currentElement.timezone }));
     } else if (nearbyCache.get(getCall(event))) {
@@ -240,23 +245,23 @@ const processEvent = event => {
     const location = ngeohash.encode(lat, long, hashPrecision);
     if (includeObj[event.from.call]) {
         includeObj[event.from.call].forEach((el) => {
-            processInclude({ lat, long, event, currentElement: pushUsers.beacons[el] });
+            processInclude({ lat, long, event, currentElement: configFile.beacons[el] });
         });
     }
     if (includeObj[`${event.from.call}-${event.from.ssid}`]) {
         includeObj[`${event.from.call}-${event.from.ssid}`].forEach((el) => {
-            processInclude({ lat, long, event, currentElement: pushUsers.beacons[el] });
+            processInclude({ lat, long, event, currentElement: configFile.beacons[el] });
         });
     }
 
     if (typeof geoObj[location] == 'undefined') return;
     geoObj[location].forEach((el) => {
-        processNearby({ lat, long, event, location, currentElement: pushUsers.beacons[el] });
+        processNearby({ lat, long, event, location, currentElement: configFile.beacons[el] });
     });
 };
 
 
 const stream = new aprs.APRSISConnector;
-stream.connect(pushUsers.myCall);
+stream.connect(configFile.myCall);
 console.log('Connected to APRS firehose');
 stream.on('aprs', processEvent);

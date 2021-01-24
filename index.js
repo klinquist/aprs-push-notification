@@ -1,7 +1,7 @@
 
 const hashPrecision = 3; //You should probably keep this as "3" unless you are receiving push notifications for a wide area (>30mi).  If that's the case, make this a "2"
-const nearbyDedupeMinutes = 10;
-const includesDedupeMinutes = 30;
+const nearbyDedupeMinutes = 60;
+const includesDedupeMinutes = 240;
 const licenseCacheDays = 14;
 
 
@@ -176,15 +176,15 @@ const sendPush = (opts, cb) => {
 };
 
 const processInclude = (opts) => {
-    const { lat, long, event, currentElement } = opts;
+    const { lat, long, event, currentElement} = opts;
     let distance = geolib.getDistance(
         { latitude: lat, longitude: long },
         { latitude: currentElement.myLat, longitude: currentElement.myLong }
     );
+    const direction = geolib.getCompassDirection({ latitude: currentElement.myLat, longitude: currentElement.myLong }, { latitude: lat, longitude: long });
     if (includesCache.get(getCall(event))) {
         return console.log(getMsg({ msg: 'Duplicate beacon', pfx: currentElement.prefix, distance, direction, event, tz: currentElement.timezone }));
     }
-    const direction = geolib.getCompassDirection({ latitude: currentElement.myLat, longitude: currentElement.myLong }, { latitude: lat, longitude: long });
     distance = distance * 0.000621371; //m to mi
     getNameFromAPI(event, (err, res) => {
         const msg = getMsg({ msg: 'Beacon', pfx: currentElement.prefix, distance, direction, event, tz: currentElement.timezone });
@@ -234,6 +234,12 @@ const processNearby = (opts) => {
 
 
 const processEvent = event => {
+
+
+    if (event && event.data && event.data.comment && event.data.comment.match(/([cSgtrpPlLs#]\d{3}|t-\d{2}|h\d{2}|b\d{5}|s\.\d{2}|s\d\.\d)/g)) {
+        console.log(event.raw);
+    }
+
     const lat = get('data.latitude', event);
     const long = get('data.longitude', event);
     if (!lat || !long) return;

@@ -238,7 +238,12 @@ const processNearby = (opts) => {
 
 
 
+let msgRcvd = 0;
+
+
+
 const processEvent = event => {
+    msgRcvd++;
     const lat = get('data.latitude', event);
     const long = get('data.longitude', event);
     if (!lat || !long) return;
@@ -265,3 +270,17 @@ const stream = new aprs.APRSISConnector;
 stream.connect(configFile.myCall);
 console.log('Connected to APRS firehose');
 stream.on('aprs', processEvent);
+
+
+setInterval(() => {
+    if (msgRcvd == 0) {
+        console.log('No messages received over the past 5 minutes, reconnecting');
+        stream.disconnect();
+        setTimeout(() => {
+            stream.connect(configFile.myCall);
+        },5000);
+    } else {
+        console.log(`In the past 5 minutes, ${msgRcvd} messages have been received over APRS.`);
+    }
+    msgRcvd = 0;
+}, 300000);
